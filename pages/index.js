@@ -68,7 +68,8 @@ useEffect(()=> {
       const msg = {
         "@type": "ERC721",
         "contract": "0xc9154424B823b10579895cCBE442d41b9Abd96Ed",
-        "tokenId": tokenId,
+        "tokenId": `${tokenId}`,
+        "tokenURI": "/ipfs/QmWLsBu6nS4ovaHbGAXprD1qEssJu4r5taQfB74sCG51tp",
         "uri": "/ipfs/QmWLsBu6nS4ovaHbGAXprD1qEssJu4r5taQfB74sCG51tp",
         "creators": [
             { 
@@ -121,7 +122,7 @@ useEffect(()=> {
       "domain": {
           name: "Mint721",
           version: "1",
-          chainId: 5,
+          chainId: 1,
           verifyingContract: "0xc9154424B823b10579895cCBE442d41b9Abd96Ed"
       },
       "primaryType": "Mint721",
@@ -148,7 +149,7 @@ useEffect(()=> {
   
   await fetch("https://ethereum-api.rarible.org/v0.1/nft/mints", requestOptionsmint)
     .then(response => response.text())
-    .then(result => console.log(result))
+    .then(result => console.log("result",result))
     .catch(error => console.log('error', error));
 
 
