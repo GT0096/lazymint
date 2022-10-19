@@ -1,8 +1,162 @@
 import Head from 'next/head'
 import Image from 'next/image'
 import styles from '../styles/Home.module.css'
+import Web3 from 'web3';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
+const [account, setAccount] = useState('');
+const [web3, setWeb3] = useState()
+function loadMeta() {
+  const {ethereum} = window;
+  if(ethereum && ethereum.isMetaMask){
+    setAccount(ethereum['selectedAddress']);
+console.log('Ethereum successfully detected!', account)
+    const web3 = new Web3(ethereum)
+    setWeb3(web3);
+  }
+}
+useEffect(()=> {
+
+  if ((window).ethereum){
+    loadMeta()
+
+  }else{
+    window.addEventListener('ethereum#initialized', loadMeta, {
+      once: true,
+    })
+    setTimeout(initiateSdk, 3000)
+  }
+    },[])
+    const loadMetamask = async () => {
+      // You need to await for user response on the metamask popup dialog
+      const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+      if(accounts){
+        setAccount(accounts[0])
+         console.log(accounts[0]);
+      }
+    }
+
+    
+
+
+    async function mint() {
+
+      let tokenId 
+      let requestOptions = {
+        method: 'GET',
+        // redirect: 'follow'
+      };
+      const endpoint = 'https://ethereum-api.rarible.org/v0.1/nft'
+      const url = endpoint + `/collections/0xc9154424B823b10579895cCBE442d41b9Abd96Ed/generate_token_id?minter=${account}`
+      console.log(url);
+      console.log("web3",web3);
+      try {
+         await fetch(url, requestOptions).then(response => response.text())
+        .then((result) => {
+          console.log(result);
+          const res = JSON.parse(result)
+          console.log(res);
+         tokenId =  parseInt(res.tokenId,10)
+        })
+        console.log(tokenId);
+
+      } catch (error) {
+        console.log(error);
+      }
+
+      const msg = {
+        "@type": "ERC721",
+        "contract": "0xc9154424B823b10579895cCBE442d41b9Abd96Ed",
+        "tokenId": tokenId,
+        "uri": "/ipfs/QmWLsBu6nS4ovaHbGAXprD1qEssJu4r5taQfB74sCG51tp",
+        "creators": [
+            { 
+                account: `${account}`, 
+                value: 10000 
+            }
+        ],
+        "royalties": [
+            { 
+                account: `${account}`, 
+                value: 2000 
+            }
+        ],
+      };
+
+      const dataStructure = {
+        "types": {
+          "EIP712Domain" : [
+            {
+              type: "string",
+              name: "name",
+            },
+            {
+              type: "string",
+              name: "version",
+            },
+            {
+              type: "uint256",
+              name: "chainId",
+            },
+            {
+              type: "address",
+              name: "verifyingContract",
+            }
+          ],
+          "Mint721": [
+              {"name": "@type", "type": "string"},
+              {"name": "contract", "type": "address"},
+              {"name": "tokenId", "type": "uint256"},
+              {"name": "tokenURI", "type": "string"},
+              {"name": "uri", "type": "string"},
+              {"name": "creators", "type": "Part[]"},
+              {"name": "royalties", "type": "Part[]"}
+          ],
+          "Part": [
+              { name: "account", type: "address" },
+              { name: "value", type: "uint96" }
+          ]
+      },
+      "domain": {
+          name: "Mint721",
+          version: "1",
+          chainId: 5,
+          verifyingContract: "0xc9154424B823b10579895cCBE442d41b9Abd96Ed"
+      },
+      "primaryType": "Mint721",
+      "message": msg,
+      }
+
+ const signature = await web3.eth.sign(web3.utils.sha3(JSON.stringify(dataStructure)), account)
+  const sign_obj = {"signatures" : [`${signature}`]}
+
+  const data = {...msg, ...sign_obj}
+  console.log(data);
+  
+
+  let myHeaders = new Headers();
+  myHeaders.append("Content-Type", "application/json");
+  let raw = JSON.stringify(data)
+
+  let requestOptionsmint = {
+    method: 'POST',
+    headers: myHeaders,
+    body: raw,
+    redirect: 'follow'
+  };
+  
+  await fetch("https://ethereum-api.rarible.org/v0.1/nft/mints", requestOptionsmint)
+    .then(response => response.text())
+    .then(result => console.log(result))
+    .catch(error => console.log('error', error));
+
+
+
+
+    }
+
+
   return (
     <div className={styles.container}>
       <Head>
@@ -12,58 +166,13 @@ export default function Home() {
       </Head>
 
       <main className={styles.main}>
-        <h1 className={styles.title}>
-          Welcome to <a href="https://nextjs.org">Next.js!</a>
-        </h1>
-
-        <p className={styles.description}>
-          Get started by editing{' '}
-          <code className={styles.code}>pages/index.js</code>
-        </p>
-
-        <div className={styles.grid}>
-          <a href="https://nextjs.org/docs" className={styles.card}>
-            <h2>Documentation &rarr;</h2>
-            <p>Find in-depth information about Next.js features and API.</p>
-          </a>
-
-          <a href="https://nextjs.org/learn" className={styles.card}>
-            <h2>Learn &rarr;</h2>
-            <p>Learn about Next.js in an interactive course with quizzes!</p>
-          </a>
-
-          <a
-            href="https://github.com/vercel/next.js/tree/canary/examples"
-            className={styles.card}
-          >
-            <h2>Examples &rarr;</h2>
-            <p>Discover and deploy boilerplate example Next.js projects.</p>
-          </a>
-
-          <a
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-          >
-            <h2>Deploy &rarr;</h2>
-            <p>
-              Instantly deploy your Next.js site to a public URL with Vercel.
-            </p>
-          </a>
+        <div>
+         <h3>Connect to metamask</h3> 
+          <button type='click' onClick={loadMetamask}>Connect</button>
+          <button type='click' onClick={mint}>Mint</button>
+          <h1>{account}</h1>
         </div>
-      </main>
-
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Powered by{' '}
-          <span className={styles.logo}>
-            <Image src="/vercel.svg" alt="Vercel Logo" width={72} height={16} />
-          </span>
-        </a>
-      </footer>
+        </main>
     </div>
   )
 }
