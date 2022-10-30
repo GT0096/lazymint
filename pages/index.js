@@ -1,23 +1,55 @@
 import Head from 'next/head'
-import Image from 'next/image'
+// @ts-ignore
+
 import styles from '../styles/Home.module.css'
 import Web3 from 'web3';
-import { useEffect, useState } from 'react';
+import { useContext, useEffect} from 'react';
+// @ts-ignore
+import signTypedData from './components/signTypeData';
+import React from 'react';
+import { ACTION_TYPE } from './_app';
+import { MetaContext } from './_app';
+import { getToken } from './components/gettoken';
+import { msgData } from './data/data';
+import { typedData } from './data/typeddata';
+import { mintNft } from './components/nftmint';
+
 
 export default function Home() {
-const [account, setAccount] = useState('');
-const [web3, setWeb3] = useState()
+
+
+const {dispatch, state} = useContext(MetaContext)
+
+const {account, web3} = state ;
+
+
+
+
+
+
 function loadMeta() {
+  // @ts-ignore
   const {ethereum} = window;
+  console.log(ethereum)
   if(ethereum && ethereum.isMetaMask){
-    setAccount(ethereum['selectedAddress']);
+    
+   dispatch({
+    type: ACTION_TYPE.SET_ACCOUNT,
+    payload: {account: `${ethereum['selectedAddress']}`}
+   }) 
 console.log('Ethereum successfully detected!', account)
     const web3 = new Web3(ethereum)
-    setWeb3(web3);
+    // @ts-ignore
+   
+    dispatch({
+      type: ACTION_TYPE.SET_WEB3,
+      payload: {web3 : web3}
+    })
   }
 }
 useEffect(()=> {
 
+  // @ts-ignore
   if ((window).ethereum){
     loadMeta()
 
@@ -25,15 +57,20 @@ useEffect(()=> {
     window.addEventListener('ethereum#initialized', loadMeta, {
       once: true,
     })
-    setTimeout(initiateSdk, 3000)
+    // @ts-ignore
+    setTimeout(loadMeta, 3000)
   }
     },[])
     const loadMetamask = async () => {
       // You need to await for user response on the metamask popup dialog
+      // @ts-ignore
       const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
       if(accounts){
-        setAccount(accounts[0])
-         console.log(accounts[0]);
+       
+        dispatch({
+          type: ACTION_TYPE.SET_ACCOUNT,
+          payload: {account: `${accounts[0]}`}
+         }) 
       }
     }
 
@@ -42,115 +79,43 @@ useEffect(()=> {
 
     async function mint() {
 
-      let tokenId 
-      let requestOptions = {
-        method: 'GET',
-        // redirect: 'follow'
-      };
-      const endpoint = 'https://ethereum-api.rarible.org/v0.1/nft'
-      const url = endpoint + `/collections/0xc9154424B823b10579895cCBE442d41b9Abd96Ed/generate_token_id?minter=${account}`
-      console.log(url);
-      console.log("web3",web3);
-      try {
-         await fetch(url, requestOptions).then(response => response.text())
-        .then((result) => {
-          console.log(result);
-          const res = JSON.parse(result)
-          console.log(res);
-         tokenId =  parseInt(res.tokenId,10)
-        })
-        console.log(tokenId);
+     const tokenId = await getToken(web3, account)
+     console.log(tokenId);
 
-      } catch (error) {
-        console.log(error);
-      }
 
-      const msg = {
-        "@type": "ERC721",
-        "contract": "0xc9154424B823b10579895cCBE442d41b9Abd96Ed",
-        "tokenId": `${tokenId}`,
-        "tokenURI": "/ipfs/QmWLsBu6nS4ovaHbGAXprD1qEssJu4r5taQfB74sCG51tp",
-        "uri": "/ipfs/QmWLsBu6nS4ovaHbGAXprD1qEssJu4r5taQfB74sCG51tp",
-        "creators": [
-            { 
-                account: `${account}`, 
-                value: 10000 
-            }
-        ],
-        "royalties": [
-            { 
-                account: `${account}`, 
-                value: 2000 
-            }
-        ],
-      };
+    const msg = msgData(tokenId.tokenId, account);
 
-      const dataStructure = {
-        "types": {
-          "EIP712Domain" : [
-            {
-              type: "string",
-              name: "name",
-            },
-            {
-              type: "string",
-              name: "version",
-            },
-            {
-              type: "uint256",
-              name: "chainId",
-            },
-            {
-              type: "address",
-              name: "verifyingContract",
-            }
-          ],
-          "Mint721": [
-              {"name": "@type", "type": "string"},
-              {"name": "contract", "type": "address"},
-              {"name": "tokenId", "type": "uint256"},
-              {"name": "tokenURI", "type": "string"},
-              {"name": "uri", "type": "string"},
-              {"name": "creators", "type": "Part[]"},
-              {"name": "royalties", "type": "Part[]"}
-          ],
-          "Part": [
-              { name: "account", type: "address" },
-              { name: "value", type: "uint96" }
-          ]
-      },
-      "domain": {
-          name: "Mint721",
-          version: "1",
-          chainId: 1,
-          verifyingContract: "0xc9154424B823b10579895cCBE442d41b9Abd96Ed"
-      },
-      "primaryType": "Mint721",
-      "message": msg,
-      }
+    console.log('msg', msg);
 
- const signature = await web3.eth.sign(web3.utils.sha3(JSON.stringify(dataStructure)), account)
-  const sign_obj = {"signatures" : [`${signature}`]}
+     
+  const dataStructure = await typedData(web3,msg)
+    console.log("datastructure",dataStructure);
 
+// const chain  = await  web3.currentProvider.request({
+//   method: "eth_chainId",
+//   from: account
+// })
+// console.log(chain);
+
+
+// const getacc = await web3.utils.checkAddressChecksum(account)
+// console.log(getacc);
+
+
+    // @ts-ignore
+  const sign = await signTypedData(web3, account, dataStructure)
+  console.log(sign);
+  const sign_obj =  {"signatures" : [sign.signature]}
   const data = {...msg, ...sign_obj}
-  console.log(data);
-  
 
-  let myHeaders = new Headers();
-  myHeaders.append("Content-Type", "application/json");
-  let raw = JSON.stringify(data)
 
-  let requestOptionsmint = {
-    method: 'POST',
-    headers: myHeaders,
-    body: raw,
-    redirect: 'follow'
-  };
-  
-  await fetch("https://ethereum-api.rarible.org/v0.1/nft/mints", requestOptionsmint)
-    .then(response => response.text())
-    .then(result => console.log("result",result))
-    .catch(error => console.log('error', error));
+
+
+// const add = await web3.utils.checkAddressChecksum(sign)
+// console.log(add);
+
+ await mintNft(data)
+
 
 
 
@@ -161,19 +126,24 @@ useEffect(()=> {
   return (
     <div className={styles.container}>
       <Head>
-        <title>Create Next App</title>
-        <meta name="description" content="Generated by create next app" />
+        <title>Myraah mint</title>
+        <meta name="Myraah-mint" content="Generated by Myraah" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
       <main className={styles.main}>
         <div>
          <h3>Connect to metamask</h3> 
-          <button type='click' onClick={loadMetamask}>Connect</button>
-          <button type='click' onClick={mint}>Mint</button>
+          <button 
+// @ts-ignore
+          type='click' onClick={loadMetamask}>Connect</button>
+          <button 
+// @ts-ignore
+          type='click' onClick={mint}>Mint</button>
           <h1>{account}</h1>
         </div>
         </main>
     </div>
   )
 }
+
